@@ -1,5 +1,7 @@
+import db_handler
 import telebot
 from telebot import types
+from db_handler import get_from_settings
 
 API_TOKEN = '5909806725:AAGOPdC46PWSwotsRRtsAo8wzucs4AAWYyU'
 
@@ -14,6 +16,7 @@ Handlers
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['help', 'start'])
 def send_welcome(message):
+    db_handler.init_new_user(message)
     text = 'You are in the main menu. Choose selection'
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = 'Search for jobs'
@@ -37,9 +40,13 @@ def always_search_settings_handler(message):
 # settings keyword handler
 @bot.message_handler(func=lambda message: 'Settings' in message.text)
 def settings_handler(message):
-    text = """Your settings:\nSpecialisation: ...\n
-    Experience: ...\nOn-site/Remote: ...\n Salary settings: ...\n
+    text = f"""Your settings:\nSpecialisation: {get_from_settings(message, 'specialisation')}
+    Experience: {get_from_settings(message, 'experience')}\nOn-site/Remote:
+    {get_from_settings(message, 'onsite_remote')}\n Salary settings: {get_from_settings(message, 'salary')}\n
     """
+
+    if get_from_settings(message, 'salary') == 'Public salary' and get_from_settings(message, 'salary_from'):
+        text += f"\nSalary starts from {get_from_settings(message, 'salary_from')}"
     markup = setting_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
@@ -100,6 +107,53 @@ def back_to_main_menu(message):
 @bot.message_handler(func=lambda message: 'Settings menu' in message.text)
 def back_to_settings(message):
     settings_handler(message)
+
+
+"""
+Settings keywords handlers
+"""
+languages_choices = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
+             'IOS', 'Android', 'C++', 'Settings menu']
+
+experiences_choices = ['No Experience', '1-2 years', '2-3 years', '3-5 years']
+onsite_remote_choices = ['Remote', 'On-site', 'Settings menu']
+salary_choices = ['Public salary', 'with a disclosed/public salary']
+public_salary_choices = ['1500$', '2500$', '3500$', '4500$', '5500$', '6500$']
+
+
+# insert specialisation into database user's settings
+@bot.message_handler(func=lambda message: message.text in languages_choices)
+def set_specialisation(message):
+    result = db_handler.insert_into_settings(message, 'specialisation')
+    bot.send_message(message.chat.id, result)
+
+
+# insert experience into database user's settings
+@bot.message_handler(func=lambda message: message.text in experiences_choices)
+def set_experience(message):
+    result = db_handler.insert_into_settings(message, 'experience')
+    bot.send_message(message.chat.id, result)
+
+
+# insert on-site/remote into database user's settings
+@bot.message_handler(func=lambda message: message.text in onsite_remote_choices)
+def set_onsite_remote(message):
+    result = db_handler.insert_into_settings(message, 'onsite_remote')
+    bot.send_message(message.chat.id, result)
+
+
+# insert salary into database user's settings
+@bot.message_handler(func=lambda message: message.text in salary_choices)
+def set_salary(message):
+    result = db_handler.insert_into_settings(message, 'salary')
+    bot.send_message(message.chat.id, result)
+
+
+# insert public salary into database user's settings
+@bot.message_handler(func=lambda message: message.text in public_salary_choices)
+def set_public_salary(message):
+    result = db_handler.insert_into_settings(message, 'salary_from')
+    bot.send_message(message.chat.id, result)
 
 
 
@@ -175,7 +229,7 @@ def experience_keyboard():
 # On-site/Remote keyboard
 def onsite_remote_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    button1 = 'Remote '
+    button1 = 'Remote'
     button2 = 'On-site'
     button3 = 'Settings menu'
 
