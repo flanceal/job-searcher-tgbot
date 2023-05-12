@@ -40,14 +40,15 @@ def always_search_settings_handler(message):
 # settings keyword handler
 @bot.message_handler(func=lambda message: 'Settings' in message.text)
 def settings_handler(message):
-    text = f"""Your settings:\nSpecialisation: {get_from_settings(message, 'specialisation')}
-    Experience: {get_from_settings(message, 'experience')}\nOn-site/Remote:
-    {get_from_settings(message, 'onsite_remote')}\n Salary settings: {get_from_settings(message, 'salary')}\n
+    settings = get_from_settings(message.chat.id, 'specialisation', 'experience', 'onsite_remote', 'salary')
+    text = f"""Your settings:\nSpecialisation: {settings[0]} \nExperience: {settings[1]}\nOn-site/Remote: {settings[2]} 
+    Salary settings: {settings[3]}
     """
 
-    if get_from_settings(message, 'salary') == 'Public salary' and get_from_settings(message, 'salary_from'):
-        text += f"\nSalary starts from {get_from_settings(message, 'salary_from')}"
-    markup = setting_keyboard()
+    if get_from_settings(message.chat.id, 'salary')[0] == 'Public salary' and get_from_settings(message.chat.id,
+                                                                                                'salary_from')[0]:
+        text += f"\nSalary starts from: {get_from_settings(message.chat.id, 'salary_from')[0]}"
+    markup = settings_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
@@ -89,12 +90,15 @@ def salary_handler(message):
 
 
 # public salary keyword handle
-@bot.message_handler(func=lambda message: 'Public salary' in message.text)
+@bot.message_handler(func=lambda message: message.text in ['Public salary', 'with a disclosed/public salary'])
 def public_salary_handler(message):
-    text = 'Salary starts from'
-    markup = public_salary_settings()
-
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+    db_handler.insert_into_settings(message, 'salary')
+    if message.text == 'Public salary':
+        text = 'Salary starts from'
+        markup = public_salary_settings()
+        bot.send_message(message.chat.id, text, reply_markup=markup)
+    else:
+        settings_handler(message)
 
 
 # back (main menu) keyword handle
@@ -113,11 +117,10 @@ def back_to_settings(message):
 Settings keywords handlers
 """
 languages_choices = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
-             'IOS', 'Android', 'C++', 'Settings menu']
+             'IOS', 'Android', 'C++']
 
 experiences_choices = ['No Experience', '1-2 years', '2-3 years', '3-5 years']
 onsite_remote_choices = ['Remote', 'On-site', 'Settings menu']
-salary_choices = ['Public salary', 'with a disclosed/public salary']
 public_salary_choices = ['1500$', '2500$', '3500$', '4500$', '5500$', '6500$']
 
 
@@ -126,6 +129,7 @@ public_salary_choices = ['1500$', '2500$', '3500$', '4500$', '5500$', '6500$']
 def set_specialisation(message):
     result = db_handler.insert_into_settings(message, 'specialisation')
     bot.send_message(message.chat.id, result)
+    settings_handler(message)
 
 
 # insert experience into database user's settings
@@ -133,6 +137,7 @@ def set_specialisation(message):
 def set_experience(message):
     result = db_handler.insert_into_settings(message, 'experience')
     bot.send_message(message.chat.id, result)
+    settings_handler(message)
 
 
 # insert on-site/remote into database user's settings
@@ -140,13 +145,7 @@ def set_experience(message):
 def set_onsite_remote(message):
     result = db_handler.insert_into_settings(message, 'onsite_remote')
     bot.send_message(message.chat.id, result)
-
-
-# insert salary into database user's settings
-@bot.message_handler(func=lambda message: message.text in salary_choices)
-def set_salary(message):
-    result = db_handler.insert_into_settings(message, 'salary')
-    bot.send_message(message.chat.id, result)
+    settings_handler(message)
 
 
 # insert public salary into database user's settings
@@ -154,7 +153,7 @@ def set_salary(message):
 def set_public_salary(message):
     result = db_handler.insert_into_settings(message, 'salary_from')
     bot.send_message(message.chat.id, result)
-
+    settings_handler(message)
 
 
 """
@@ -176,7 +175,7 @@ def always_search_keyboard():
 
 
 # Keyboard for setting
-def setting_keyboard():
+def settings_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = 'Specialisation'
     button2 = 'Experience'
