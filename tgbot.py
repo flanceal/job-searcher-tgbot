@@ -3,21 +3,31 @@ import telebot
 from telebot import types
 from db_handler import get_from_settings
 
+# api token of telegram bot
 API_TOKEN = '5909806725:AAGOPdC46PWSwotsRRtsAo8wzucs4AAWYyU'
 
+# define telegram bot instance
 bot = telebot.TeleBot(API_TOKEN)
 
 
 """
-Handlers
+Handlers for messages
 """
 
 
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['help', 'start'])
 def send_welcome(message):
+    # initialise new user in database table
     db_handler.init_new_user(message)
+    main_menu()
+
+
+# Main menu keyboard and 'Back' keyword handler
+@bot.message_handler(func=lambda message: 'Back' in message.text)
+def main_menu(message):
     text = 'You are in the main menu. Choose selection'
+    # Keyboard for main menu of bot
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = 'Search for jobs'
     button2 = 'Always search'
@@ -28,7 +38,7 @@ def send_welcome(message):
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-# always search keywords handler
+# always search keywords handler (comment and document later)
 @bot.message_handler(func=lambda message: 'Always search' in message.text)
 def always_search_settings_handler(message):
     text = "Choose settings"
@@ -37,35 +47,45 @@ def always_search_settings_handler(message):
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-# settings keyword handler
-@bot.message_handler(func=lambda message: 'Settings' in message.text)
+# settings and back keywords handler
+@bot.message_handler(func=lambda message: message.text in ['Settings', 'Settings menu'])
 def settings_handler(message):
-    settings = get_from_settings(message.chat.id, 'specialisation', 'experience', 'onsite_remote', 'salary')
-    text = f"""Your settings:\nSpecialisation: {settings[0]} \nExperience: {settings[1]}\nOn-site/Remote: {settings[2]} 
-    Salary settings: {settings[3]}
+    # Get the user's settings from the database
+    specialisation, experience, onsite_remote, salary, salary_from = get_from_settings(message.chat.id,
+                                                                                       'specialisation', 'experience',
+                                                                                       'onsite_remote', 'salary',
+                                                                                       'salary_from')
+    # Construct the text of the reply message
+    text = f"""Your settings:\nSpecialisation: {specialisation} \nExperience: {experience}\nOn-site/Remote:
+    {onsite_remote} Salary settings: {salary}
     """
 
-    if get_from_settings(message.chat.id, 'salary')[0] == 'Public salary' and get_from_settings(message.chat.id,
-                                                                                                'salary_from')[0]:
-        text += f"\nSalary starts from: {get_from_settings(message.chat.id, 'salary_from')[0]}"
+    # If the user's salary setting is "Public salary" and they have specified a minimum salary, add it to the text
+    if salary == 'Public salary' and salary_from:
+        text += f"\nSalary starts from: {salary}"
     markup = settings_keyboard()
 
+    # Send the reply message to the user
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-# specialisation keyword handle
+# specialisation keyword handler
 @bot.message_handler(func=lambda message: 'Specialisation' in message.text)
 def specialisation_handler(message):
     text = 'Choose specialisation'
+
+    # Create keyboard with specialisation parameters for the user
     markup = specialisation_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-# experience keyword handle
+# experience keyword handler
 @bot.message_handler(func=lambda message: 'Experience' in message.text)
 def experience_handler(message):
     text = 'Choose experience'
+
+    # Create keyboard with experience parameters for the user
     markup = experience_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
@@ -75,6 +95,8 @@ def experience_handler(message):
 @bot.message_handler(func=lambda message: 'On-site/Remote' in message.text)
 def onsite_remote_handler(message):
     text = 'Choose type'
+
+    # Create keyboard with on-site/remote parameters for the user
     markup = onsite_remote_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
@@ -84,39 +106,39 @@ def onsite_remote_handler(message):
 @bot.message_handler(func=lambda message: 'Salary settings' in message.text)
 def salary_handler(message):
     text = 'Choose settings'
+
+    # Create keyboard with salary parameters for the user
     markup = salary_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-# public salary keyword handle
+# detailed salary keywords handle
 @bot.message_handler(func=lambda message: message.text in ['Public salary', 'with a disclosed/public salary'])
 def public_salary_handler(message):
+    # Insert the chosen salary setting into the database
     db_handler.insert_into_settings(message, 'salary')
+    # If the user chose 'Public salary', ask for the minimum salary
     if message.text == 'Public salary':
         text = 'Salary starts from'
         markup = public_salary_settings()
         bot.send_message(message.chat.id, text, reply_markup=markup)
+    # If the user chose 'with a disclosed/public salary', just insert it into the database
     else:
         settings_handler(message)
 
 
 # back (main menu) keyword handle
-@bot.message_handler(func=lambda message: 'Back' in message.text)
-def back_to_main_menu(message):
-    send_welcome(message)
-
-
-# settings menu keyword handle
-@bot.message_handler(func=lambda message: 'Settings menu' in message.text)
-def back_to_settings(message):
-    settings_handler(message)
+"""
+CREATE SEPARATE MAIN MENU FUNCTION
+"""
 
 
 """
 Settings keywords handlers
 """
-languages_choices = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
+# lists of choices for user settings used in the Telegram bot.
+specialisations = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
              'IOS', 'Android', 'C++']
 
 experiences_choices = ['No Experience', '1-2 years', '2-3 years', '3-5 years']
@@ -124,36 +146,27 @@ onsite_remote_choices = ['Remote', 'On-site', 'Settings menu']
 public_salary_choices = ['1500$', '2500$', '3500$', '4500$', '5500$', '6500$']
 
 
-# insert specialisation into database user's settings
-@bot.message_handler(func=lambda message: message.text in languages_choices)
-def set_specialisation(message):
-    result = db_handler.insert_into_settings(message, 'specialisation')
-    bot.send_message(message.chat.id, result)
-    settings_handler(message)
+# Handle all settings keywords with one function
+@bot.message_handler(func=lambda message: message.text in specialisations + experiences_choices + onsite_remote_choices
+                                          + public_salary_choices)
+def set_setting(message):
+    # Identify the type of setting based on the user's input
+    setting_type = None
+    if message.text in specialisations:
+        setting_type = 'specialisation'
+    elif message.text in experiences_choices:
+        setting_type = 'experience'
+    elif message.text in onsite_remote_choices:
+        setting_type = 'onsite_remote'
+    elif message.text in public_salary_choices:
+        setting_type = 'salary_from'
 
+    # If a valid setting type is identified, insert the setting into the database and send a message back to the user
+    if setting_type is not None:
+        result = db_handler.insert_into_settings(message, setting_type)
+        bot.send_message(message.chat.id, result)
+        settings_handler(message)
 
-# insert experience into database user's settings
-@bot.message_handler(func=lambda message: message.text in experiences_choices)
-def set_experience(message):
-    result = db_handler.insert_into_settings(message, 'experience')
-    bot.send_message(message.chat.id, result)
-    settings_handler(message)
-
-
-# insert on-site/remote into database user's settings
-@bot.message_handler(func=lambda message: message.text in onsite_remote_choices)
-def set_onsite_remote(message):
-    result = db_handler.insert_into_settings(message, 'onsite_remote')
-    bot.send_message(message.chat.id, result)
-    settings_handler(message)
-
-
-# insert public salary into database user's settings
-@bot.message_handler(func=lambda message: message.text in public_salary_choices)
-def set_public_salary(message):
-    result = db_handler.insert_into_settings(message, 'salary_from')
-    bot.send_message(message.chat.id, result)
-    settings_handler(message)
 
 
 """
