@@ -9,14 +9,14 @@ conn_pool = pool.SimpleConnectionPool(1, 5, database='job_board', host='localhos
 
 def init_new_user(message):
     """
-    Inserts a new user into the 'seen_jobs' table, if the user's ID does not already exist.
+    Inserts a new user into the 'users_settings' table, if the user's ID does not already exist.
     :param message: Telegram message object
     """
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
-            # Create an SQL statement that inserts the user's ID into the 'seen_jobs' table,
+            # Create an SQL statement that inserts the user's ID into the 'users_settings' table,
             # ignoring the insert if the user's ID already exists
-            insert_statement = sql.SQL("INSERT INTO seen_jobs(id) VALUES(%s) ON CONFLICT DO NOTHING")
+            insert_statement = sql.SQL("INSERT INTO users_settings(id) VALUES(%s) ON CONFLICT DO NOTHING")
             cursor.execute(insert_statement, [message.chat.id])
 
             # Commit the transaction
@@ -31,7 +31,7 @@ def init_new_user(message):
 
 def insert_into_settings(message, column):
     """
-    Inserts a value for a specified column into the 'seen_jobs' table for a specified user ID.
+    Inserts a value for a specified column into the 'users_settings' table for a specified user ID.
     :param message: Telegram message object
     :param column: Name of the column in which to insert the value
     :return: A confirmation message string
@@ -39,7 +39,7 @@ def insert_into_settings(message, column):
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
             # Create an SQL statement that updates the specified column for the specified user ID
-            insert_statement = sql.SQL("UPDATE seen_jobs SET {} = %s WHERE id = %s").format(sql.Identifier(column))
+            insert_statement = sql.SQL("UPDATE users_settings SET {} = %s WHERE id = %s").format(sql.Identifier(column))
 
             # Execute the SQL statement, passing in the message text and chat ID as parameters
             cursor.execute(insert_statement, [message.text, message.chat.id])
@@ -60,7 +60,7 @@ def insert_into_settings(message, column):
 
 def get_from_settings(user_id, *args):
     """
-    Retrieves the values for one or more specified columns from the 'seen_jobs' table
+    Retrieves the values for one or more specified columns from the 'users_settings' table
     for a specified user ID.
     :param user_id: ID of the user whose settings to retrieve
     :param args: List of column names to retrieve values for
@@ -68,9 +68,9 @@ def get_from_settings(user_id, *args):
     """
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
-            # Create an SQL statement that selects the specified columns from the 'seen_jobs' table,
+            # Create an SQL statement that selects the specified columns from the 'users_settings' table,
             # for the specified user ID
-            get_statement = sql.SQL("SELECT {} FROM seen_jobs WHERE id = %s").format(
+            get_statement = sql.SQL("SELECT {} FROM users_settings WHERE id = %s").format(
                 sql.SQL(',').join(map(sql.Identifier, args)))
 
             # Execute the SQL statement, passing in the user ID as a parameter
