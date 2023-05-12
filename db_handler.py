@@ -2,62 +2,88 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2 import sql
 
-
-# Set up a connection pool
-conn_pool = pool.SimpleConnectionPool(1, 5,
-                                      database='job_board',
-                                      host='localhost',
-                                      port='5432')
+# Set up a connection pool with a minimum of 1 connection and a maximum of 5 connections
+# to the PostgreSQL database named 'job_board', located on 'localhost' at port 5432
+conn_pool = pool.SimpleConnectionPool(1, 5, database='job_board', host='localhost', port='5432')
 
 
-# initialise user in database
 def init_new_user(message):
+    """
+    Inserts a new user into the 'seen_jobs' table, if the user's ID does not already exist.
+    :param message: Telegram message object
+    """
     try:
-        conn = conn_pool.getconn()
-        cursor = conn.cursor()
+        with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            # Create an SQL statement that inserts the user's ID into the 'seen_jobs' table,
+            # ignoring the insert if the user's ID already exists
+            insert_statement = sql.SQL("INSERT INTO seen_jobs(id) VALUES(%s) ON CONFLICT DO NOTHING")
+            cursor.execute(insert_statement, [message.chat.id])
 
-        insert_statement = sql.SQL("INSERT INTO seen_jobs(id) VALUES(%s) ON CONFLICT DO NOTHING")
-        cursor.execute(insert_statement, [message.chat.id])
+            # Commit the transaction
+            conn.commit()
 
-        conn.commit()
-
+            # Close the cursor and return the connection to the connection pool
+            cursor.close()
+            conn_pool.putconn(conn)
     except psycopg2.Error as err:
-        print('An error occured: ', err)
+        print('An error occurred: ', err)
 
 
-# insert into user's setting
 def insert_into_settings(message, column):
+    """
+    Inserts a value for a specified column into the 'seen_jobs' table for a specified user ID.
+    :param message: Telegram message object
+    :param column: Name of the column in which to insert the value
+    :return: A confirmation message string
+    """
     try:
-        conn = conn_pool.getconn()
-        cursor = conn.cursor()
+        with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            # Create an SQL statement that updates the specified column for the specified user ID
+            insert_statement = sql.SQL("UPDATE seen_jobs SET {} = %s WHERE id = %s").format(sql.Identifier(column))
 
-        insert_statement = sql.SQL("UPDATE seen_jobs SET {} = %s WHERE id = %s").format(sql.Identifier(column))
+            # Execute the SQL statement, passing in the message text and chat ID as parameters
+            cursor.execute(insert_statement, [message.text, message.chat.id])
 
-        cursor.execute(insert_statement, [message.text, message.chat.id])
+            # Commit the transaction to the database
+            conn.commit()
 
-        conn.commit()
-        cursor.close()
-        conn_pool.putconn(conn)
+            # Close the cursor and return the connection to the connection pool
+            cursor.close()
+            conn_pool.putconn(conn)
 
-        return f'Setting of {column} set to {message.text}'
+            # Return a confirmation message string
+            return f'Setting of {column} set to {message.text}'
     except psycopg2.Error as err:
+        # If an error occurs, return an error message string
         return f"An error occurred: {err}"
 
 
-# get from user's settings
-def get_from_settings(message, column):
+def get_from_settings(user_id, *args):
+    """
+    Retrieves the values for one or more specified columns from the 'seen_jobs' table
+    for a specified user ID.
+    :param user_id: ID of the user whose settings to retrieve
+    :param args: List of column names to retrieve values for
+    :return: A tuple of the retrieved values
+    """
     try:
-        conn = conn_pool.getconn()
-        cursor = conn.cursor()
+        with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            # Create an SQL statement that selects the specified columns from the 'seen_jobs' table,
+            # for the specified user ID
+            get_statement = sql.SQL("SELECT {} FROM seen_jobs WHERE id = %s").format(
+                sql.SQL(',').join(map(sql.Identifier, args)))
 
-        get_statement = sql.SQL("SELECT %s FROM seen_jobs WHERE id = %s")
+            # Execute the SQL statement, passing in the user ID as a parameter
+            cursor.execute(get_statement, [user_id])
 
-        cursor.execute(get_statement, [column, message.chat.id])
+            # Fetch the first row of the result set
+            result = cursor.fetchone()
 
-        result = cursor.fetchall()
-        cursor.close()
-        conn_pool.putconn(conn)
-        return result
+            # Close the cursor and return the connection to the connection pool
+            cursor.close()
+            conn_pool.putconn(conn)
+
+            return result
+
     except psycopg2.Error as err:
         print("An error occurred: ", err)
-
