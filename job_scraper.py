@@ -20,7 +20,7 @@ class DjinniScrapper:
     Web Scraper for site 'Djinni' that makes reusable TCP request to 'Djinni' site
     and parses all the jobs for specific specialisation
     """
-    djinni_url = 'https://djinni.co/jobs/?primary_keyword={}&exp_level=no_exp&exp_level=1y&page={}'
+    djinni_url = 'https://djinni.co/jobs/?primary_keyword={}&page={}'
 
     # set specialisation to search and create reusable TCP request
     def __init__(self, specialisation):
@@ -60,7 +60,7 @@ class DjinniScrapper:
         for job in jobs:
             # Extract job information
             # title
-            job_title = job.find('div', 'list-jobs__title list__title order-1').text.strip()
+            job_title = job.find('div', 'list-jobs__title list__title order-1').find('span').text.strip()
 
             # company name
             job_company_name = job.find('div', class_='list-jobs__details__info').find('a').text.strip()

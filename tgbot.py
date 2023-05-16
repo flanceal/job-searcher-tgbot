@@ -136,27 +136,20 @@ def search_jobs(message):
 
 
 def compare_jobs(message):
-    experiences = {"0-1 years": ["Без досвіду", 1],
-                   "1-2 years": [1, 2],
-                   "2-3 years": [2, 3],
-                   '3-5 years': [3, 5]}
+    experiences = {"0-1 years": ["Без досвіду", '1 рік досвіду'],
+                   "1-2 years": ['1 рік досвіду', '2 роки досвіду'],
+                   "2-3 years": ['2 роки досвіду', '3 роки досвіду'],
+                   '3-5 years': ['3 роки досвіду', '5 років досвіду']}
     # Get the user's settings from the database
     specialisation, location, salary = get_from_settings(message.chat.id, 'specialisation',
                                                                      'onsite_remote', 'salary')
     experience = experiences.get(get_from_settings(message.chat.id, 'experience')[0])
     for job in DjinniScrapper(specialisation).search_jobs():
-        print(f"Job: {(job.experience)}")
-        print(f"User: {experience}")
-        print(f"Job: {location}")
-        print(f"User: {location}")
-
         if salary == 'with a disclosed/public salary':
-            if int(job.experience) in experience and job.location == location:
-                print('hello world')
+            if job.experience in experience and job.location == location:
                 yield job
         else:
             if job.experience in experience and job.location == location and job.salary:
-                print('hello world')
                 yield job
 
 
@@ -178,7 +171,7 @@ Settings keywords handlers
 specialisations = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
              'IOS', 'Android', 'C++']
 
-experiences_choices = ['No Experience', '1-2 years', '2-3 years', '3-5 years']
+experiences_choices = ['0-1 years', '1-2 years', '2-3 years', '3-5 years']
 onsite_remote_choices = ['Remote', 'On-site', 'Settings menu']
 salary_choices = ['Public salary', 'with a disclosed/public salary']
 
