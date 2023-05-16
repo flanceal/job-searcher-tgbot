@@ -59,15 +59,29 @@ def insert_into_settings(message, column):
         return f"An error occurred: {err}"
 
 
-def insert_seen_job(chat_id, title, company, experience, location, link):
+def insert_seen_job(chat_id, title, specialisation, company, experience, location, link):
+    """Inserts a new row into the seen_jobs table with the provided data.
+
+        Args:
+            chat_id (int): The ID of the user who saw the job.
+            title (str): The title of the job.
+            company (str): The name of the company offering the job.
+            experience (str): The required experience level for the job.
+            location (str): The location of the job.
+            link (str): The URL link to the job posting.
+
+        Returns:
+            str: An error message string if an error occurs, otherwise returns None.
+        """
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
             # Create an SQL statement that inserts a new row into the seen_jobs table
-            sql_statement = sql.SQL("INSERT INTO seen_jobs(user_id, title, company, experience, location, link) "
-                                    "VALUES (%s, %s, %s, %s, %s, %s)")
+            sql_statement = sql.SQL("INSERT INTO seen_jobs(user_id, title, specialisation, "
+                                    "company, experience, location, link) "
+                                    "VALUES (%s, %s, %s, %s, %s, %s, %s)")
 
             # Execute the SQL statement with the given parameters
-            cursor.execute(sql_statement, (chat_id, title, company, experience, location, link))
+            cursor.execute(sql_statement, (chat_id, title, specialisation, company, experience, location, link))
 
             # Commit the transaction to the database
             conn.commit()
@@ -106,6 +120,30 @@ def get_from_settings(user_id, *args):
             conn_pool.putconn(conn)
 
             return result
+
+    except psycopg2.Error as err:
+        print("An error occurred: ", err)
+
+
+def get_jobs(chat_id, specialisation):
+    try:
+        with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            # Create an SQL statement that selects the specified columns from the 'seen_jobs' table,
+            # for the specified user ID and specialisation
+            get_statement = sql.SQL("SELECT title, company, experience, location, link FROM seen_jobs "
+                                    "WHERE user_id = %s AND specialisation = %s")
+
+            # Execute the SQL statement, passing in the user ID and specialisation as parameters
+            cursor.execute(get_statement, [chat_id, specialisation])
+
+            # Fetch all rows of the result set
+            results = cursor.fetchall()
+
+            # Close the cursor and return the connection to the connection pool
+            cursor.close()
+            conn_pool.putconn(conn)
+
+            return results
 
     except psycopg2.Error as err:
         print("An error occurred: ", err)

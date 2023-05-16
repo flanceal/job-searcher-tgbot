@@ -1,5 +1,6 @@
 import db_handler
 import telebot
+from time import sleep
 from telebot import types
 from DjinniScraper import DjinniScrapper
 from db_handler import get_from_settings
@@ -10,7 +11,8 @@ API_TOKEN = '6224238593:AAHTNgVVOf9za27beLuC4UgVhDI7YPgcRBs'
 # define telegram bot instance
 bot = telebot.TeleBot(API_TOKEN)
 
-
+# define always search parameter
+always_search = False
 """
 Handlers for messages
 """
@@ -52,6 +54,25 @@ def always_search_settings_handler(message):
     markup = always_search_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
+
+
+# start always search keywords handler
+@bot.message_handler(func=lambda message: 'Start searching' in message.text)
+def always_search_settings_handler(message):
+    global always_search
+    always_search = True
+    bot.send_message(message.chat.id, "Always search has been activated")
+    while always_search is True:
+        search_jobs(message)
+        sleep(120)
+
+
+# stop always search keywords handler
+@bot.message_handler(func=lambda message: 'Stop searching' in message.text)
+def always_search_settings_handler(message):
+    global always_search
+    always_search = False
+    bot.send_message(message.chat.id, "Always search has been stopped")
 
 
 # settings and back keywords handler
@@ -124,6 +145,7 @@ def public_salary_handler(message):
     bot.send_message(message.chat.id, text)
     settings_handler(message)
 
+
 """
 Searching functions
 """
@@ -134,8 +156,10 @@ def search_jobs(message):
         text = show_jobs(job)
 
         # Insert shown job into seen_jobs table
-        db_handler.insert_seen_job(message.chat.id, job.title, job.company, job.experience, job.location, job.link)
+        db_handler.insert_seen_job(message.chat.id, job.title, job.specialisation,
+                                   job.company, job.experience, job.location, job.link)
         bot.send_message(message.chat.id, text)
+        sleep(1)
 
 
 def compare_jobs(message):
@@ -145,16 +169,38 @@ def compare_jobs(message):
                    '3-5 years': ['3 роки досвіду', '5 років досвіду'],
                    '5+ years': ['5 років досвіду']}
     # Get the user's settings from the database
-    specialisation, location, salary = get_from_settings(message.chat.id, 'specialisation',
-                                                                     'onsite_remote', 'salary')
+    specialisation, location, salary = get_from_settings(message.chat.id, 'specialisation', 'onsite_remote', 'salary')
     experience = experiences.get(get_from_settings(message.chat.id, 'experience')[0])
+
+    # Keep track of whether any matching jobs have been found
+    found_jobs = False
+
     for job in DjinniScrapper(specialisation).search_jobs():
         if salary == 'with a disclosed/public salary':
-            if job.experience in experience and job.location == location:
+            if job.experience in experience and job.location == location and not is_job_seen(message,
+                                                                                             job, job.specialisation):
+                found_jobs = True
                 yield job
         else:
-            if job.experience in experience and job.location == location and job.salary:
+            if job.experience in experience and job.location == location and job.salary and \
+            not is_job_seen(message, job, job.specialisation):
+                found_jobs = True
                 yield job
+
+    # If no matching jobs were found
+    if not found_jobs:
+        text = 'No mathing jobs found or all jobs were seen'
+        bot.send_message(message.chat.id, text)
+
+
+def is_job_seen(message, job, specialisation):
+    """
+    Returns True if the job has already been seen by the user, False otherwise.
+    """
+    for title, company, experience, location, link in db_handler.get_jobs(message.chat.id, specialisation):
+        if job.title == title and job.company == company and job.experience == experience and job.link == link:
+            return True
+    return False
 
 
 def show_jobs(job):
@@ -164,7 +210,7 @@ def show_jobs(job):
     Location: {job.location}
     """
     if job.salary:
-        text += f"\Salary: {job.salary}"
+        text += f"\nSalary: {job.salary}"
     return text
 
 
@@ -173,7 +219,7 @@ Settings keywords handlers
 """
 # lists of choices for user settings used in the Telegram bot.
 specialisations = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
-             'IOS', 'Android', 'C++']
+                   'IOS', 'Android', 'C++']
 
 experiences_choices = ['0-1 years', '1-2 years', '2-3 years', '3-5 years', '5+ years']
 onsite_remote_choices = ['Remote', 'On-site', 'Settings menu']
@@ -181,8 +227,8 @@ salary_choices = ['Public salary', 'with a disclosed/public salary']
 
 
 # Handle all settings keywords with one function
-@bot.message_handler(func=lambda message: message.text in specialisations + experiences_choices + onsite_remote_choices
-                                          + salary_choices)
+@bot.message_handler(func=lambda message: message.text in specialisations + experiences_choices +
+                                          onsite_remote_choices + salary_choices)
 def set_setting(message):
     # Identify the type of setting based on the user's input
     setting_type = None
@@ -200,7 +246,6 @@ def set_setting(message):
         result = db_handler.insert_into_settings(message, setting_type)
         bot.send_message(message.chat.id, result)
         settings_handler(message)
-
 
 
 """

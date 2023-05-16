@@ -70,6 +70,7 @@ class DjinniScrapper:
                     job_salary = job_salary.text.strip()
                 job_link = 'https://djinni.co' + job.find('a', class_='profile')['href']
                 # create and yield JobPosting object
-                yield JobPosting(job_title, job_experience, job_company_name, job_remote_onsite, job_link, job_salary)
+                yield JobPosting(job_title, self.specialisation,
+                                 job_experience, job_company_name, job_remote_onsite, job_link, job_salary)
         except (requests.exceptions.Timeout, requests.exceptions.RequestException, AttributeError) as e:
             print(f"An error occurred while trying to scrape Djinni: {e}")
