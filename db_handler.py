@@ -59,6 +59,27 @@ def insert_into_settings(message, column):
         return f"An error occurred: {err}"
 
 
+def insert_seen_job(chat_id, title, company, experience, location, link):
+    try:
+        with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            # Create an SQL statement that inserts a new row into the seen_jobs table
+            sql_statement = sql.SQL("INSERT INTO seen_jobs(user_id, title, company, experience, location, link) "
+                                    "VALUES (%s, %s, %s, %s, %s, %s)")
+
+            # Execute the SQL statement with the given parameters
+            cursor.execute(sql_statement, (chat_id, title, company, experience, location, link))
+
+            # Commit the transaction to the database
+            conn.commit()
+
+            # Close the cursor and return the connection to the connection pool
+            cursor.close()
+            conn_pool.putconn(conn)
+    except psycopg2.Error as err:
+        # If an error occurs, return an error message string
+        return f"An error occurred: {err}"
+
+
 def get_from_settings(user_id, *args):
     """
     Retrieves the values for one or more specified columns from the 'users_settings' table

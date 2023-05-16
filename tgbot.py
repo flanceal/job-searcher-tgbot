@@ -1,11 +1,11 @@
 import db_handler
 import telebot
 from telebot import types
-from job_scraper import DjinniScrapper
+from DjinniScraper import DjinniScrapper
 from db_handler import get_from_settings
 
 # api token of telegram bot
-API_TOKEN = '5909806725:AAGOPdC46PWSwotsRRtsAo8wzucs4AAWYyU'
+API_TOKEN = '6224238593:AAHTNgVVOf9za27beLuC4UgVhDI7YPgcRBs'
 
 # define telegram bot instance
 bot = telebot.TeleBot(API_TOKEN)
@@ -130,8 +130,11 @@ Searching functions
 
 
 def search_jobs(message):
-    for appropriate_job in compare_jobs(message):
-        text = show_jobs(appropriate_job)
+    for job in compare_jobs(message):
+        text = show_jobs(job)
+
+        # Insert shown job into seen_jobs table
+        db_handler.insert_seen_job(message.chat.id, job.title, job.company, job.experience, job.location, job.link)
         bot.send_message(message.chat.id, text)
 
 
@@ -139,7 +142,8 @@ def compare_jobs(message):
     experiences = {"0-1 years": ["Без досвіду", '1 рік досвіду'],
                    "1-2 years": ['1 рік досвіду', '2 роки досвіду'],
                    "2-3 years": ['2 роки досвіду', '3 роки досвіду'],
-                   '3-5 years': ['3 роки досвіду', '5 років досвіду']}
+                   '3-5 years': ['3 роки досвіду', '5 років досвіду'],
+                   '5+ years': ['5 років досвіду']}
     # Get the user's settings from the database
     specialisation, location, salary = get_from_settings(message.chat.id, 'specialisation',
                                                                      'onsite_remote', 'salary')
@@ -171,7 +175,7 @@ Settings keywords handlers
 specialisations = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
              'IOS', 'Android', 'C++']
 
-experiences_choices = ['0-1 years', '1-2 years', '2-3 years', '3-5 years']
+experiences_choices = ['0-1 years', '1-2 years', '2-3 years', '3-5 years', '5+ years']
 onsite_remote_choices = ['Remote', 'On-site', 'Settings menu']
 salary_choices = ['Public salary', 'with a disclosed/public salary']
 
@@ -260,10 +264,11 @@ def experience_keyboard():
     button2 = '1-2 years'
     button3 = '2-3 years'
     button4 = '3-5 years'
-    button5 = 'Settings menu'
+    button5 = '5+ years'
+    button6 = 'Settings menu'
 
-    markup.row(button1, button2)
-    markup.row(button3, button4, button5)
+    markup.row(button1, button2, button3)
+    markup.row(button4, button5, button6)
 
     return markup
 
