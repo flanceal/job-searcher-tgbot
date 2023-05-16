@@ -2,6 +2,7 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2 import sql
 
+
 # Set up a connection pool with a minimum of 1 connection and a maximum of 5 connections
 # to the PostgreSQL database named 'job_board', located on 'localhost' at port 5432
 conn_pool = pool.SimpleConnectionPool(1, 5, database='job_board', host='localhost', port='5432')
