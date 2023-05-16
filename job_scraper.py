@@ -20,15 +20,12 @@ class DjinniScrapper:
     Web Scraper for site 'Djinni' that makes reusable TCP request to 'Djinni' site
     and parses all the jobs for specific specialisation
     """
-    djinni_url = 'https://djinni.co/jobs/?primary_keyword={}&page={}'
+    djinni_url = 'https://djinni.co/jobs/?primary_keyword={}&exp_level=no_exp&exp_level=1y&page={}'
 
     # set specialisation to search and create reusable TCP request
     def __init__(self, specialisation):
         self.specialisation = specialisation
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-        })
 
     # Close the session after parsing all the jobs
     def __del__(self):
@@ -62,10 +59,24 @@ class DjinniScrapper:
                            "Office/Remote на ваш вибір": "Both"}
         for job in jobs:
             # Extract job information
+            # title
             job_title = job.find('div', 'list-jobs__title list__title order-1').text.strip()
+
+            # company name
             job_company_name = job.find('div', class_='list-jobs__details__info').find('a').text.strip()
+
+            # remote or on-site
             job_remote_onsite = concise_mapping.get(job.find_all('nobr', class_='ml-1')[-1].text.strip())
-            job_experience = job.find('div', class_='list-jobs__details__info').text.split()[-5]
+
+            # experience
+            job_experience = None
+            nobr_list = job.find('div', class_='list-jobs__details__info').find_all('nobr')
+            for nobr in nobr_list:
+                if 'досвіду' in nobr.text.strip():
+                    job_experience = nobr.text.strip()[2:]
+                    break
+
+            # salary
             job_salary = job.find('span', class_='public-salary-item')
             if job_salary:
                 job_salary = job_salary.text.strip()

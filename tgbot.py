@@ -131,8 +131,8 @@ Searching functions
 
 def search_jobs(message):
     for appropriate_job in compare_jobs(message):
-        for text in show_jobs(appropriate_job):
-            bot.send_message(message.chat.id, text)
+        text = show_jobs(appropriate_job)
+        bot.send_message(message.chat.id, text)
 
 
 def compare_jobs(message):
@@ -143,13 +143,20 @@ def compare_jobs(message):
     # Get the user's settings from the database
     specialisation, location, salary = get_from_settings(message.chat.id, 'specialisation',
                                                                      'onsite_remote', 'salary')
-    experience = experiences.get(get_from_settings(message.chat))
+    experience = experiences.get(get_from_settings(message.chat.id, 'experience')[0])
     for job in DjinniScrapper(specialisation).search_jobs():
+        print(f"Job: {(job.experience)}")
+        print(f"User: {experience}")
+        print(f"Job: {location}")
+        print(f"User: {location}")
+
         if salary == 'with a disclosed/public salary':
-            if job.experience in experience and job.location == location and job.salary:
+            if int(job.experience) in experience and job.location == location:
+                print('hello world')
                 yield job
         else:
-            if job.experience in experience and job.location == location:
+            if job.experience in experience and job.location == location and job.salary:
+                print('hello world')
                 yield job
 
 
@@ -161,7 +168,7 @@ def show_jobs(job):
     """
     if job.salary:
         text += f"\Salary: {job.salary}"
-    yield text
+    return text
 
 
 """
