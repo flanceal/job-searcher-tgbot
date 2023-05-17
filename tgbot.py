@@ -14,6 +14,9 @@ bot = telebot.TeleBot(API_TOKEN)
 
 # define always search parameter
 always_search = False
+
+# define search parameter
+active_search = True
 """
 Handlers for messages
 """
@@ -59,13 +62,32 @@ def main_menu(message):
 # always search keywords handler (comment and document later)
 @bot.message_handler(func=lambda message: 'Search for jobs 🕵️‍♂️' in message.text)
 def search_handler(message):
-    search_jobs(message)
+    if get_from_settings(message.chat.id, 'specialisation')[0]:
+        markup = search_keyboard()
+        bot.send_message(message.chat.id, 'Please choose your search settings', reply_markup=markup)
+    else:
+        markup = specialisation_keyboard()
+        text = "Oops! 😕 It looks like you haven't specified your preferred job specialisation yet. " \
+            "Please set your specialisation first"
+        bot.send_message(message.chat.id, text, reply_markup=markup)
+
+
+# always search keywords handler (comment and document later)
+@bot.message_handler(func=lambda message: message.text in ['Enable search', 'Stop search'])
+def search_settings_handler(message):
+    global active_search
+    if message.text == 'Enable search':
+        active_search = True
+        search_jobs(message, True)
+    else:
+        active_search = False
+        bot.send_message(message.chat.id, "Search has been stopped")
 
 
 # always search keywords handler (comment and document later)
 @bot.message_handler(func=lambda message: 'Always search 🔍' in message.text)
 def always_search_settings_handler(message):
-    text = "Please choose your search settings."
+    text = "Please choose your always search settings."
     markup = always_search_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
@@ -94,7 +116,7 @@ def always_search_settings_handler(message):
 
 
 # settings and back keywords handler
-@bot.message_handler(func=lambda message: message.text in ['Settings ⚙️', 'Settings menu ⚙️'])
+@bot.message_handler(func=lambda message: message.text in ['Settings ⚙️', 'Settings menu'])
 def settings_handler(message):
     # Get the user's settings from the database
     specialisation, experience, location, salary = get_from_settings(message.chat.id, 'specialisation', 'experience',
@@ -184,19 +206,20 @@ def search_jobs(message, send_message=True):
     Returns:
         None
     """
-    for job in compare_jobs(message, send_message):
-        text = show_jobs(job)
+    while active_search:
+        for job in compare_jobs(message, send_message):
+            text = show_jobs(job)
 
-        # button for job link under the message
-        markup = types.InlineKeyboardMarkup()
-        button = types.InlineKeyboardButton(text='See details', url=job.link)
-        markup.add(button)
+            # button for job link under the message
+            markup = types.InlineKeyboardMarkup()
+            button = types.InlineKeyboardButton(text='See details', url=job.link)
+            markup.add(button)
 
-        # Insert shown job into seen_jobs table
-        db_handler.insert_seen_job(message.chat.id, job.title, job.specialisation,
-                                   job.company, job.experience, job.location, job.link)
-        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=markup)
-        sleep(1)
+            # Insert shown job into seen_jobs table
+            db_handler.insert_seen_job(message.chat.id, job.title, job.specialisation,
+                                       job.company, job.experience, job.location, job.link)
+            bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=markup)
+            sleep(1)
 
 
 def compare_jobs(message, send_message=True):
@@ -227,16 +250,9 @@ def compare_jobs(message, send_message=True):
     found_jobs = False
     # Compare jobs attributes with user's criteria and check whether job is in 'seen_jobs' table in database
     for job in DjinniScrapper(specialisation).search_jobs():
-        if salary == 'with a disclosed/public salary':
-            if job.experience in experience and job.location == location and not is_job_seen(message,
-                                                                                             job, job.specialisation):
-                found_jobs = True
-                yield job
-        else:
-            if job.experience in experience and job.location == location and job.salary and \
-            not is_job_seen(message, job, job.specialisation):
-                found_jobs = True
-                yield job
+        if is_matching_job(message, job, experience, location, specialisation, salary):
+            found_jobs = True
+            yield job
 
     # If no matching jobs were found
     if not found_jobs and send_message:
@@ -245,6 +261,22 @@ def compare_jobs(message, send_message=True):
         Don't worry, new opportunities might arise soon!"""
 
         bot.send_message(message.chat.id, text)
+
+
+def is_matching_job(message, job, experience, location, specialisation, salary):
+    if experience and job.experience not in experience:
+        return False
+
+    if location and job.location != location:
+        return False
+
+    if is_job_seen(message, job, specialisation):
+        return False
+
+    if salary == 'Public salary' and not job.salary:
+        return False
+
+    return True
 
 
 def is_job_seen(message, job, specialisation):
@@ -296,8 +328,8 @@ Settings keywords handlers
 specialisations = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
                    'IOS', 'Android', 'C++']
 
-experiences_choices = ['0-1 years', '1-2 years', '2-3 years', '3-5 years', '5+ years']
-onsite_remote_choices = ['Remote', 'On-site', 'Settings menu']
+experiences_choices = ['0-1 years', '1-2 years', '2-3 years', '3-5 years', '5+ years', 'Any experience']
+onsite_remote_choices = ['Remote', 'On-site', "Any workplace", 'Settings menu']
 salary_choices = ['Public salary', 'with a disclosed/public salary']
 
 
@@ -328,11 +360,24 @@ Keyboards
 """
 
 
+# Keyboard for search
+def search_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    button1 = 'Enable search'
+    button2 = 'Stop search'
+    button5 = 'Back'
+
+    markup.row(button1, button2)
+    markup.row(button5)
+
+    return markup
+
+
 # Keyboard for always search
 def always_search_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    button1 = 'Start searching'
-    button2 = 'Stop searching'
+    button1 = 'Enable always search'
+    button2 = 'Stop always search'
     button5 = 'Back'
 
     markup.row(button1, button2)
@@ -385,10 +430,11 @@ def experience_keyboard():
     button3 = '2-3 years'
     button4 = '3-5 years'
     button5 = '5+ years'
-    button6 = 'Settings menu'
+    button6 = 'Any experience'
+    button7 = 'Settings menu'
 
-    markup.row(button1, button2, button3)
-    markup.row(button4, button5, button6)
+    markup.row(button1, button2, button3, button4)
+    markup.row(button5, button6, button7)
 
     return markup
 
@@ -398,10 +444,11 @@ def onsite_remote_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = 'Remote'
     button2 = 'On-site'
-    button3 = 'Settings menu'
+    button3 = 'Any workplace'
+    button4 = 'Settings menu'
 
     markup.row(button1, button2)
-    markup.row(button3)
+    markup.row(button3, button4)
 
     return markup
 

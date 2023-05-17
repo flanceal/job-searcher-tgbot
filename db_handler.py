@@ -42,8 +42,14 @@ def insert_into_settings(message, column):
             # Create an SQL statement that updates the specified column for the specified user ID
             insert_statement = sql.SQL("UPDATE users_settings SET {} = %s WHERE id = %s").format(sql.Identifier(column))
 
-            # Execute the SQL statement, passing in the message text and chat ID as parameters
-            cursor.execute(insert_statement, [message.text, message.chat.id])
+            null_values = ['Any experience', 'Any workplace']
+
+            if message.text not in null_values:
+
+                # Execute the SQL statement, passing in the message text and chat ID as parameters
+                cursor.execute(insert_statement, [message.text, message.chat.id])
+            else:
+                cursor.execute(insert_statement, [None, message.chat.id])
 
             # Commit the transaction to the database
             conn.commit()
