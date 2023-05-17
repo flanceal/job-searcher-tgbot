@@ -18,9 +18,10 @@ def init_new_user(message):
             # Create an SQL statement that inserts the user's ID into the 'users_settings' table,
             # ignoring the insert if the user's ID already exists
             insert_settings = sql.SQL("INSERT INTO users_settings(id) VALUES(%s) ON CONFLICT DO NOTHING")
-            insert_search_status = sql.SQL("INSERT INTO user_search_status(user_id) VALUES(%s) ON CONFLICT DO NOTHING")
+            insert_search_status = sql.SQL("INSERT INTO user_search_status(user_id, search_status,"
+                                           " always_search_status) VALUES(%s, %s, %s) ON CONFLICT DO NOTHING")
             cursor.execute(insert_settings, [message.chat.id])
-            cursor.execute(insert_search_status, [message.chat.id])
+            cursor.execute(insert_search_status, [message.chat.id, True, True])
 
             # Commit the transaction
             conn.commit()
@@ -175,10 +176,11 @@ User's search value
 """
 
 
-def update_search_status(user_id, status):
+def update_search_status(user_id, search_param, status):
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
-            get_statement = sql.SQL("UPDATE user_search_status SET status = %s WHERE user_id = %s")
+            get_statement = sql.SQL("UPDATE user_search_status SET {} = %s WHERE user_id = %s")\
+                .format(sql.Identifier(search_param))
 
             # Execute the SQL statement, passing in the user ID and status as parameters
             cursor.execute(get_statement, [status, user_id])
@@ -193,10 +195,11 @@ def update_search_status(user_id, status):
         print("An error occurred: ", err)
 
 
-def get_user_search_status(user_id):
+def get_user_search_status(user_id, search_param):
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
-            get_statement = sql.SQL("SELECT search_status FROM user_search_status WHERE user_id = %s")
+            get_statement = sql.SQL("SELECT {} FROM user_search_status WHERE user_id = %s").\
+                format(sql.Identifier(search_param))
 
             # Execute the SQL statement, passing in the user ID
             cursor.execute(get_statement, [user_id])

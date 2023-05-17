@@ -71,10 +71,10 @@ def search_handler(message):
 @bot.message_handler(func=lambda message: message.text in ['Enable search', 'Disable search'])
 def search_settings_handler(message):
     if message.text == 'Enable search':
-        db_handler.update_search_status(message.chat.id, True)
-        search_jobs(message, True)
+        db_handler.update_search_status(message.chat.id, 'search_status', True)
+        search_jobs(message, False)
     else:
-        db_handler.update_search_status(message.chat.id, False)
+        db_handler.update_search_status(message.chat.id, 'search_status', False)
         bot.send_message(message.chat.id, "Search has been stopped")
 
 
@@ -90,19 +90,24 @@ def always_search_settings_handler(message):
 @bot.message_handler(func=lambda message: 'Enable always search' in message.text)
 def always_search_settings_handler(message):
     text = "Always search has been activated. I will continuously search for new job opportunities."
+    db_handler.update_search_status(message.chat.id, 'always_search_status', True)
     bot.send_message(message.chat.id, text)
     main_menu(message)
-    while True:
-        search_jobs(message, False)
+
+    while db_handler.get_user_search_status(message.chat.id, 'always_search_status'):
+        search_jobs(message, True)
         sleep(120)
+        print('working')
 
 
 # stop always search keywords handler
 @bot.message_handler(func=lambda message: 'Disable always search' in message.text)
 def always_search_settings_handler(message):
     text = "Always search has been stopped. I will no longer search for new job opportunities automatically."
+    db_handler.update_search_status(message.chat.id, 'always_search_status', False)
     bot.send_message(message.chat.id, text)
     main_menu(message)
+    search_jobs(message, False)
 
 
 # settings and back keywords handler
@@ -197,8 +202,12 @@ def search_jobs(message, always_search=False):
         None
     """
     for job in compare_jobs(message, always_search):
-        search_status = db_handler.get_user_search_status(message.chat.id)[0][0]
-        if not search_status:
+        search_status = db_handler.get_user_search_status(message.chat.id, 'search_status')[0][0]
+        always_search_status = db_handler.get_user_search_status(message.chat.id, 'always_search_status')[0][0]
+        if not search_status and not always_search:
+            print('break')
+            break
+        elif not always_search_status and always_search:
             print('break')
             break
         text = show_jobs(job)
@@ -357,7 +366,7 @@ Keyboards
 def search_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = 'Enable search'
-    button2 = 'Stop search'
+    button2 = 'Disable search'
     button5 = 'Back'
 
     markup.row(button1, button2)
@@ -370,7 +379,7 @@ def search_keyboard():
 def always_search_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = 'Enable always search'
-    button2 = 'Stop always search'
+    button2 = 'Disable always search'
     button5 = 'Back'
 
     markup.row(button1, button2)
