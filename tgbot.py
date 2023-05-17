@@ -22,21 +22,34 @@ Handlers for messages
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['help', 'start'])
 def send_welcome(message):
+    greeting_message = """
+    <b>Hello! Welcome to the Bot! 😊</b>
+
+    I am here to assist you in finding jobs that match your preferences. 
+    Feel free to explore and customize your job search settings.
+
+    <b>Here are some options you can choose:</b>
+    - Search for jobs 🔍
+    - Activate "Always search" mode 🔄
+    - Configure settings ⚙️
+
+    Let me know how I can help you! 🤖
+    """
     # initialise new user in database table
     db_handler.init_new_user(message)
+    bot.send_message(message.chat.id, text=greeting_message, parse_mode='HTML')
     main_menu(message)
 
 
-# Main menu keyboard and 'Back' keyword handler
 @bot.message_handler(func=lambda message: 'Back' in message.text)
 def main_menu(message):
-    text = 'You are in the main menu. Choose selection'
+    text = '👋 Welcome to the main menu. Please make your selection.'
 
-    # Keyboard for main menu of bot
+    # Keyboard for the main menu of the bot
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    button1 = 'Search for jobs'
-    button2 = 'Always search'
-    button3 = 'Settings'
+    button1 = 'Search for jobs 🕵️‍♂️'
+    button2 = 'Always search 🔍'
+    button3 = 'Settings ⚙️'
     markup.row(button1, button2)
     markup.row(button3)
 
@@ -44,29 +57,29 @@ def main_menu(message):
 
 
 # always search keywords handler (comment and document later)
-@bot.message_handler(func=lambda message: 'Search for jobs' in message.text)
+@bot.message_handler(func=lambda message: 'Search for jobs 🕵️‍♂️' in message.text)
 def search_handler(message):
     search_jobs(message)
 
 
 # always search keywords handler (comment and document later)
-@bot.message_handler(func=lambda message: 'Always search' in message.text)
+@bot.message_handler(func=lambda message: 'Always search 🔍' in message.text)
 def always_search_settings_handler(message):
-    text = "Choose settings"
+    text = "Please choose your search settings."
     markup = always_search_keyboard()
 
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-# start always search keywords handler
 @bot.message_handler(func=lambda message: 'Start searching' in message.text)
 def always_search_settings_handler(message):
     global always_search
     always_search = True
-    bot.send_message(message.chat.id, "Always search has been activated")
+    text = "Always search has been activated. I will continuously search for new job opportunities."
+    bot.send_message(message.chat.id, text)
     main_menu(message)
     while always_search is True:
-        search_jobs(message)
+        search_jobs(message, False)
         sleep(120)
 
 
@@ -75,31 +88,35 @@ def always_search_settings_handler(message):
 def always_search_settings_handler(message):
     global always_search
     always_search = False
-    bot.send_message(message.chat.id, "Always search has been stopped")
+    text = "Always search has been stopped. I will no longer search for new job opportunities automatically."
+    bot.send_message(message.chat.id, text)
     main_menu(message)
 
 
 # settings and back keywords handler
-@bot.message_handler(func=lambda message: message.text in ['Settings', 'Settings menu'])
+@bot.message_handler(func=lambda message: message.text in ['Settings ⚙️', 'Settings menu ⚙️'])
 def settings_handler(message):
     # Get the user's settings from the database
     specialisation, experience, location, salary = get_from_settings(message.chat.id, 'specialisation', 'experience',
                                                                      'onsite_remote', 'salary')
 
-    # Construct the text of the reply message
-    text = f"""Your settings:\nSpecialisation: {specialisation} \nExperience: {experience}\nOn-site/Remote:
-    {location} Salary settings: {salary}
-    """
+    # Construct the text of the reply message with HTML formatting
+    text = f"""⚙️ Your settings:
+    <b>Specialisation:</b> {specialisation} 
+    <b>Experience:</b> {experience}
+    <b>On-site/Remote:</b> {location}
+    <b>Salary settings:</b> {salary}"""
+
     markup = settings_keyboard()
 
     # Send the reply message to the user
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+    bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode='HTML')
 
 
 # specialisation keyword handler
 @bot.message_handler(func=lambda message: 'Specialisation' in message.text)
 def specialisation_handler(message):
-    text = 'Choose specialisation'
+    text = 'Please choose your specialisation.'
 
     # Create keyboard with specialisation parameters for the user
     markup = specialisation_keyboard()
@@ -110,7 +127,7 @@ def specialisation_handler(message):
 # experience keyword handler
 @bot.message_handler(func=lambda message: 'Experience' in message.text)
 def experience_handler(message):
-    text = 'Choose experience'
+    text = 'Please choose your experience.'
 
     # Create keyboard with experience parameters for the user
     markup = experience_keyboard()
@@ -121,7 +138,7 @@ def experience_handler(message):
 #  on-site/remote keyword handle
 @bot.message_handler(func=lambda message: 'On-site/Remote' in message.text)
 def onsite_remote_handler(message):
-    text = 'Choose type'
+    text = 'Please choose your workplace preferences: On-site or Remote? 🏢💻"'
 
     # Create keyboard with on-site/remote parameters for the user
     markup = onsite_remote_keyboard()
@@ -132,7 +149,7 @@ def onsite_remote_handler(message):
 # salary keyword handle
 @bot.message_handler(func=lambda message: 'Salary settings' in message.text)
 def salary_handler(message):
-    text = 'Choose settings'
+    text = 'Please choose your workplace preferences: Public salary or with a disclosed/public salary? 💸'
 
     # Create keyboard with salary parameters for the user
     markup = salary_keyboard()
@@ -145,7 +162,7 @@ def salary_handler(message):
 def public_salary_handler(message):
     # Insert the chosen salary setting into the database
     db_handler.insert_into_settings(message, 'salary')
-    text = f"Salary set to {message.text}"
+    text = f"Salary preferences set to {message.text} ✅"
     bot.send_message(message.chat.id, text)
     settings_handler(message)
 
@@ -155,39 +172,48 @@ Searching functions
 """
 
 
-def search_jobs(message):
+def search_jobs(message, send_message=True):
     """
     Search for jobs based on user's settings and send them as messages to the user.
 
     Args:
         message (telegram.Message): The message object containing user information.
+        send_message: Specifies whether to send a message if no matching jobs are found while comparing jobs in
+            compare jobs function
 
     Returns:
         None
     """
-    for job in compare_jobs(message):
+    for job in compare_jobs(message, send_message):
         text = show_jobs(job)
+
+        # button for job link under the message
+        markup = types.InlineKeyboardMarkup()
+        button = types.InlineKeyboardButton(text='See details', url=job.link)
+        markup.add(button)
 
         # Insert shown job into seen_jobs table
         db_handler.insert_seen_job(message.chat.id, job.title, job.specialisation,
                                    job.company, job.experience, job.location, job.link)
-        bot.send_message(message.chat.id, text)
+        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=markup)
         sleep(1)
 
 
-def compare_jobs(message):
+def compare_jobs(message, send_message=True):
     """
     Compare jobs from web scraping with user's settings and yield matching jobs.
 
     Args:
         message (telegram.Message): The message object containing user information.
-
+        send_message (bool, optional): Specifies whether to send a message if no matching jobs are found.
+            If set to True (default), a message will be sent. If set to False, no message will be sent.
     Yields:
         Job: A matching job object.
 
     Returns:
         None
     """
+    print('new search')
     experiences = {"0-1 years": ["Без досвіду", '1 рік досвіду'],
                    "1-2 years": ['1 рік досвіду', '2 роки досвіду'],
                    "2-3 years": ['2 роки досвіду', '3 роки досвіду'],
@@ -197,9 +223,8 @@ def compare_jobs(message):
     specialisation, location, salary = get_from_settings(message.chat.id, 'specialisation', 'onsite_remote', 'salary')
     experience = experiences.get(get_from_settings(message.chat.id, 'experience')[0])
 
-    # Keep track of whether any matching jobs have been found
+    # Monitor whether there is no matching jobs or all the jobs were seen
     found_jobs = False
-
     # Compare jobs attributes with user's criteria and check whether job is in 'seen_jobs' table in database
     for job in DjinniScrapper(specialisation).search_jobs():
         if salary == 'with a disclosed/public salary':
@@ -214,8 +239,11 @@ def compare_jobs(message):
                 yield job
 
     # If no matching jobs were found
-    if not found_jobs:
-        text = 'No mathing jobs found or all jobs were seen'
+    if not found_jobs and send_message:
+        text = """Oops! 😕
+        It seems that there are no matching jobs available at the moment or you have seen all the available jobs.
+        Don't worry, new opportunities might arise soon!"""
+
         bot.send_message(message.chat.id, text)
 
 
@@ -248,12 +276,16 @@ def show_jobs(job):
         str: The formatted text representation of the job.
     """
     text = f"""
-    Job has been found:
-    {job.title}\nCompany: {job.company}\nRequired experience: {job.experience} years of experience\n
-    Location: {job.location}
+    <b>Job Found ✨</b>
+
+    {job.title}
+    Company: {job.company}
+    Required Experience: {job.experience}
+    Workplace: {job.location}
     """
     if job.salary:
         text += f"\nSalary: {job.salary}"
+
     return text
 
 

@@ -9,6 +9,7 @@ class DjinniScrapper:
     and parses all the jobs for specific specialisation
     """
     djinni_url = 'https://djinni.co/jobs/?primary_keyword={}&page={}'
+    exceptional_specialisations = {''}
 
     # set specialisation to search and create reusable TCP request
     def __init__(self, specialisation):

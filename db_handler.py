@@ -53,7 +53,7 @@ def insert_into_settings(message, column):
             conn_pool.putconn(conn)
 
             # Return a confirmation message string
-            return f'Setting of {column} set to {message.text}'
+            return f'{column} is set to {message.text}'
     except psycopg2.Error as err:
         # If an error occurs, return an error message string
         return f"An error occurred: {err}"
