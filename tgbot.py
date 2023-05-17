@@ -12,11 +12,6 @@ API_TOKEN = '6224238593:AAHTNgVVOf9za27beLuC4UgVhDI7YPgcRBs'
 # define telegram bot instance
 bot = telebot.TeleBot(API_TOKEN)
 
-# define always search parameter
-always_search = False
-
-# define search parameter
-active_search = True
 """
 Handlers for messages
 """
@@ -73,14 +68,13 @@ def search_handler(message):
 
 
 # always search keywords handler (comment and document later)
-@bot.message_handler(func=lambda message: message.text in ['Enable search', 'Stop search'])
+@bot.message_handler(func=lambda message: message.text in ['Enable search', 'Disable search'])
 def search_settings_handler(message):
-    global active_search
     if message.text == 'Enable search':
-        active_search = True
+        db_handler.update_search_status(message.chat.id, True)
         search_jobs(message, True)
     else:
-        active_search = False
+        db_handler.update_search_status(message.chat.id, False)
         bot.send_message(message.chat.id, "Search has been stopped")
 
 
@@ -93,23 +87,19 @@ def always_search_settings_handler(message):
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-@bot.message_handler(func=lambda message: 'Start searching' in message.text)
+@bot.message_handler(func=lambda message: 'Enable always search' in message.text)
 def always_search_settings_handler(message):
-    global always_search
-    always_search = True
     text = "Always search has been activated. I will continuously search for new job opportunities."
     bot.send_message(message.chat.id, text)
     main_menu(message)
-    while always_search is True:
+    while True:
         search_jobs(message, False)
         sleep(120)
 
 
 # stop always search keywords handler
-@bot.message_handler(func=lambda message: 'Stop searching' in message.text)
+@bot.message_handler(func=lambda message: 'Disable always search' in message.text)
 def always_search_settings_handler(message):
-    global always_search
-    always_search = False
     text = "Always search has been stopped. I will no longer search for new job opportunities automatically."
     bot.send_message(message.chat.id, text)
     main_menu(message)
@@ -194,41 +184,44 @@ Searching functions
 """
 
 
-def search_jobs(message, send_message=True):
+def search_jobs(message, always_search=False):
     """
     Search for jobs based on user's settings and send them as messages to the user.
 
     Args:
         message (telegram.Message): The message object containing user information.
-        send_message: Specifies whether to send a message if no matching jobs are found while comparing jobs in
+        always_search: Specifies whether to send a message if no matching jobs are found while comparing jobs in
             compare jobs function
 
     Returns:
         None
     """
-    while active_search:
-        for job in compare_jobs(message, send_message):
-            text = show_jobs(job)
+    for job in compare_jobs(message, always_search):
+        search_status = db_handler.get_user_search_status(message.chat.id)[0][0]
+        if not search_status:
+            print('break')
+            break
+        text = show_jobs(job)
 
-            # button for job link under the message
-            markup = types.InlineKeyboardMarkup()
-            button = types.InlineKeyboardButton(text='See details', url=job.link)
-            markup.add(button)
+        # button for job link under the message
+        markup = types.InlineKeyboardMarkup()
+        button = types.InlineKeyboardButton(text='See details', url=job.link)
+        markup.add(button)
 
-            # Insert shown job into seen_jobs table
-            db_handler.insert_seen_job(message.chat.id, job.title, job.specialisation,
-                                       job.company, job.experience, job.location, job.link)
-            bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=markup)
-            sleep(1)
+        # Insert shown job into seen_jobs table
+        db_handler.insert_seen_job(message.chat.id, job.title, job.specialisation,
+                                   job.company, job.experience, job.location, job.link)
+        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=markup)
+        sleep(1)
 
 
-def compare_jobs(message, send_message=True):
+def compare_jobs(message, always_search=False):
     """
     Compare jobs from web scraping with user's settings and yield matching jobs.
 
     Args:
         message (telegram.Message): The message object containing user information.
-        send_message (bool, optional): Specifies whether to send a message if no matching jobs are found.
+        always_search (bool, optional): Specifies whether to send a message if no matching jobs are found.
             If set to True (default), a message will be sent. If set to False, no message will be sent.
     Yields:
         Job: A matching job object.
@@ -255,7 +248,7 @@ def compare_jobs(message, send_message=True):
             yield job
 
     # If no matching jobs were found
-    if not found_jobs and send_message:
+    if not found_jobs and not always_search:
         text = """Oops! 😕
         It seems that there are no matching jobs available at the moment or you have seen all the available jobs.
         Don't worry, new opportunities might arise soon!"""

@@ -17,8 +17,10 @@ def init_new_user(message):
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
             # Create an SQL statement that inserts the user's ID into the 'users_settings' table,
             # ignoring the insert if the user's ID already exists
-            insert_statement = sql.SQL("INSERT INTO users_settings(id) VALUES(%s) ON CONFLICT DO NOTHING")
-            cursor.execute(insert_statement, [message.chat.id])
+            insert_settings = sql.SQL("INSERT INTO users_settings(id) VALUES(%s) ON CONFLICT DO NOTHING")
+            insert_search_status = sql.SQL("INSERT INTO user_search_status(user_id) VALUES(%s) ON CONFLICT DO NOTHING")
+            cursor.execute(insert_settings, [message.chat.id])
+            cursor.execute(insert_search_status, [message.chat.id])
 
             # Commit the transaction
             conn.commit()
@@ -166,3 +168,48 @@ def get_jobs(chat_id, specialisation):
 
     except psycopg2.Error as err:
         print("An error occurred: ", err)
+
+
+"""
+User's search value
+"""
+
+
+def update_search_status(user_id, status):
+    try:
+        with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            get_statement = sql.SQL("UPDATE user_search_status SET status = %s WHERE user_id = %s")
+
+            # Execute the SQL statement, passing in the user ID and status as parameters
+            cursor.execute(get_statement, [status, user_id])
+
+            # Commit the changes
+            conn.commit()
+
+            # Close the cursor and return the connection to the connection pool
+            cursor.close()
+            conn_pool.putconn(conn)
+    except psycopg2.Error as err:
+        print("An error occurred: ", err)
+
+
+def get_user_search_status(user_id):
+    try:
+        with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            get_statement = sql.SQL("SELECT search_status FROM user_search_status WHERE user_id = %s")
+
+            # Execute the SQL statement, passing in the user ID
+            cursor.execute(get_statement, [user_id])
+
+            # Catch user's search status
+            result = cursor.fetchall()
+
+            # Close the cursor and return the connection to the connection pool
+            cursor.close()
+            conn_pool.putconn(conn)
+
+            return result
+
+    except psycopg2.Error as err:
+        print("An error occurred: ", err)
+
