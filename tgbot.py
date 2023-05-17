@@ -5,6 +5,7 @@ from telebot import types
 from DjinniScraper import DjinniScrapper
 from db_handler import get_from_settings
 
+
 # api token of telegram bot
 API_TOKEN = '6224238593:AAHTNgVVOf9za27beLuC4UgVhDI7YPgcRBs'
 
@@ -30,6 +31,7 @@ def send_welcome(message):
 @bot.message_handler(func=lambda message: 'Back' in message.text)
 def main_menu(message):
     text = 'You are in the main menu. Choose selection'
+
     # Keyboard for main menu of bot
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = 'Search for jobs'
@@ -62,6 +64,7 @@ def always_search_settings_handler(message):
     global always_search
     always_search = True
     bot.send_message(message.chat.id, "Always search has been activated")
+    main_menu(message)
     while always_search is True:
         search_jobs(message)
         sleep(120)
@@ -73,6 +76,7 @@ def always_search_settings_handler(message):
     global always_search
     always_search = False
     bot.send_message(message.chat.id, "Always search has been stopped")
+    main_menu(message)
 
 
 # settings and back keywords handler
@@ -152,6 +156,15 @@ Searching functions
 
 
 def search_jobs(message):
+    """
+    Search for jobs based on user's settings and send them as messages to the user.
+
+    Args:
+        message (telegram.Message): The message object containing user information.
+
+    Returns:
+        None
+    """
     for job in compare_jobs(message):
         text = show_jobs(job)
 
@@ -163,6 +176,18 @@ def search_jobs(message):
 
 
 def compare_jobs(message):
+    """
+    Compare jobs from web scraping with user's settings and yield matching jobs.
+
+    Args:
+        message (telegram.Message): The message object containing user information.
+
+    Yields:
+        Job: A matching job object.
+
+    Returns:
+        None
+    """
     experiences = {"0-1 years": ["Без досвіду", '1 рік досвіду'],
                    "1-2 years": ['1 рік досвіду', '2 роки досвіду'],
                    "2-3 years": ['2 роки досвіду', '3 роки досвіду'],
@@ -175,6 +200,7 @@ def compare_jobs(message):
     # Keep track of whether any matching jobs have been found
     found_jobs = False
 
+    # Compare jobs attributes with user's criteria and check whether job is in 'seen_jobs' table in database
     for job in DjinniScrapper(specialisation).search_jobs():
         if salary == 'with a disclosed/public salary':
             if job.experience in experience and job.location == location and not is_job_seen(message,
@@ -195,7 +221,15 @@ def compare_jobs(message):
 
 def is_job_seen(message, job, specialisation):
     """
-    Returns True if the job has already been seen by the user, False otherwise.
+    Check if a job has already been seen by the user.
+
+    Args:
+        message (telegram.Message): The message object containing user information.
+        job (Job): The job object to check.
+        specialisation (str): The specialisation of the job.
+
+    Returns:
+        bool: True if the job has already been seen, False otherwise.
     """
     for title, company, experience, location, link in db_handler.get_jobs(message.chat.id, specialisation):
         if job.title == title and job.company == company and job.experience == experience and job.link == link:
@@ -204,6 +238,15 @@ def is_job_seen(message, job, specialisation):
 
 
 def show_jobs(job):
+    """
+    Create a text representation of a job.
+
+    Args:
+        job (Job): The job object to display.
+
+    Returns:
+        str: The formatted text representation of the job.
+    """
     text = f"""
     Job has been found:
     {job.title}\nCompany: {job.company}\nRequired experience: {job.experience} years of experience\n

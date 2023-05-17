@@ -126,6 +126,19 @@ def get_from_settings(user_id, *args):
 
 
 def get_jobs(chat_id, specialisation):
+    """
+    Retrieve jobs from the seen_jobs table for a specific user and specialisation.
+
+    Args:
+        chat_id (int): The ID of the chat/user.
+        specialisation (str): The specialisation of the jobs.
+
+    Returns:
+        list: A list of job records matching the user and specialisation.
+
+    Raises:
+        psycopg2.Error: If an error occurs while executing the SQL statement.
+    """
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
             # Create an SQL statement that selects the specified columns from the 'seen_jobs' table,
