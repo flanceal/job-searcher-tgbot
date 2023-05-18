@@ -10,7 +10,8 @@ conn_pool = pool.SimpleConnectionPool(1, 5, database='job_board', host='localhos
 
 def init_new_user(message):
     """
-    Inserts a new user into the 'users_settings' table, if the user's ID does not already exist.
+    Inserts a new user into the 'users_settings' and 'user_search_status' tables, if the user's ID does not already
+     exist.
     :param message: Telegram message object
     """
     try:
@@ -18,10 +19,9 @@ def init_new_user(message):
             # Create an SQL statement that inserts the user's ID into the 'users_settings' table,
             # ignoring the insert if the user's ID already exists
             insert_settings = sql.SQL("INSERT INTO users_settings(id) VALUES(%s) ON CONFLICT DO NOTHING")
-            insert_search_status = sql.SQL("INSERT INTO user_search_status(user_id, search_status,"
-                                           " always_search_status) VALUES(%s, %s, %s) ON CONFLICT DO NOTHING")
+            insert_search_status = sql.SQL("INSERT INTO user_search_status(user_id) VALUES(%s) ON CONFLICT DO NOTHING")
             cursor.execute(insert_settings, [message.chat.id])
-            cursor.execute(insert_search_status, [message.chat.id, True, True])
+            cursor.execute(insert_search_status, [message.chat.id])
 
             # Commit the transaction
             conn.commit()
@@ -74,6 +74,7 @@ def insert_seen_job(chat_id, title, specialisation, company, experience, locatio
         Args:
             chat_id (int): The ID of the user who saw the job.
             title (str): The title of the job.
+            specialisation (str): The specialisation of the job
             company (str): The name of the company offering the job.
             experience (str): The required experience level for the job.
             location (str): The location of the job.
@@ -196,15 +197,28 @@ def update_search_status(user_id, search_param, status):
 
 
 def get_user_search_status(user_id, search_param):
+    """
+    Retrieve the search status of a user for a specific search parameter.
+
+    Args:
+        user_id (int): The ID of the user.
+        search_param (str): The search parameter to retrieve the status for.
+
+    Returns:
+        list: A list of search status values for the user and the specified search parameter.
+
+    """
     try:
+        # Get a connection from the connection pool
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
+            # Construct the SQL statement to retrieve the search status
             get_statement = sql.SQL("SELECT {} FROM user_search_status WHERE user_id = %s").\
                 format(sql.Identifier(search_param))
 
             # Execute the SQL statement, passing in the user ID
             cursor.execute(get_statement, [user_id])
 
-            # Catch user's search status
+            # Fetch all the search status values
             result = cursor.fetchall()
 
             # Close the cursor and return the connection to the connection pool
@@ -214,5 +228,7 @@ def get_user_search_status(user_id, search_param):
             return result
 
     except psycopg2.Error as err:
+        # Handle any errors that occur during the database operation
         print("An error occurred: ", err)
+
 

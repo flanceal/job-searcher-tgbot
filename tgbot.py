@@ -12,12 +12,11 @@ API_TOKEN = '6224238593:AAHTNgVVOf9za27beLuC4UgVhDI7YPgcRBs'
 # define telegram bot instance
 bot = telebot.TeleBot(API_TOKEN)
 
-"""
-Handlers for messages
-"""
+# Handlers for messages
 
 
 # Handle '/start' and '/help'
+# This function is triggered when a user sends commands like '/start' or '/help'
 @bot.message_handler(commands=['help', 'start'])
 def send_welcome(message):
     greeting_message = """
@@ -39,6 +38,8 @@ def send_welcome(message):
     main_menu(message)
 
 
+# back keyword handler
+# This function is triggered when a message contains the text 'Back'
 @bot.message_handler(func=lambda message: 'Back' in message.text)
 def main_menu(message):
     text = '👋 Welcome to the main menu. Please make your selection.'
@@ -54,7 +55,10 @@ def main_menu(message):
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-# always search keywords handler (comment and document later)
+# search for jobs keyword handler
+# This function checks if the user has specified a job specialization in their settings.
+# If a specialization is specified, it sends a search settings keyboard to the user.
+# If no specialization is specified, it sends a specialization selection keyboard to the user.
 @bot.message_handler(func=lambda message: 'Search for jobs 🕵️‍♂️' in message.text)
 def search_handler(message):
     if get_from_settings(message.chat.id, 'specialisation')[0]:
@@ -68,49 +72,70 @@ def search_handler(message):
 
 
 # always search keywords handler (comment and document later)
+# This function updates the search status in the database based on the user's selection.
+# If the user chooses to enable search, it updates the search status to True and calls the search_jobs function.
+# If the user chooses to disable search, it updates the search status to False and sends a message indicating that
+# the search has been stopped.
 @bot.message_handler(func=lambda message: message.text in ['Enable search', 'Disable search'])
 def search_settings_handler(message):
     if message.text == 'Enable search':
+        # Update search status to True in the database
         db_handler.update_search_status(message.chat.id, 'search_status', True)
+        # Call the search_jobs function with the second argument set to False
         search_jobs(message, False)
     else:
+        # Update search status to False in the database
         db_handler.update_search_status(message.chat.id, 'search_status', False)
+        # Send a message indicating that the search has been stopped
         bot.send_message(message.chat.id, "Search has been stopped")
 
 
-# always search keywords handler (comment and document later)
+# always search keywords handler
 @bot.message_handler(func=lambda message: 'Always search 🔍' in message.text)
 def always_search_settings_handler(message):
-    text = "Please choose your always search settings."
-    markup = always_search_keyboard()
+    if get_from_settings(message.chat.id, 'specialisation')[0]:
+        text = "Please choose your always search settings."
+        markup = always_search_keyboard()
 
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+        bot.send_message(message.chat.id, text, reply_markup=markup)
+    else:
+        markup = specialisation_keyboard()
+        text = "Oops! 😕 It looks like you haven't specified your preferred job specialisation yet. " \
+            "Please set your specialisation first"
+        bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
+# enable always search keyword handler
+# Enable always search handler
 @bot.message_handler(func=lambda message: 'Enable always search' in message.text)
 def always_search_settings_handler(message):
-    text = "Always search has been activated. I will continuously search for new job opportunities."
+    # Change always search status into True
     db_handler.update_search_status(message.chat.id, 'always_search_status', True)
-    bot.send_message(message.chat.id, text)
+    # Send activation message
+    bot.send_message(message.chat.id, "Always search has been activated."
+                                      " I will continuously search for new job opportunities.")
     main_menu(message)
 
+    # Perform job searches while always search is enabled
     while db_handler.get_user_search_status(message.chat.id, 'always_search_status'):
         search_jobs(message, True)
         sleep(120)
         print('working')
 
 
-# stop always search keywords handler
+# Disable always search handler
 @bot.message_handler(func=lambda message: 'Disable always search' in message.text)
 def always_search_settings_handler(message):
-    text = "Always search has been stopped. I will no longer search for new job opportunities automatically."
+    # Change always search status into False
     db_handler.update_search_status(message.chat.id, 'always_search_status', False)
-    bot.send_message(message.chat.id, text)
+    # Send deactivation message
+    bot.send_message(message.chat.id, "Always search has been stopped."
+                                      " I will no longer search for new job opportunities automatically.")
+    # Return to the main menu
     main_menu(message)
-    search_jobs(message, False)
 
 
-# settings and back keywords handler
+# settings keywords handler
 @bot.message_handler(func=lambda message: message.text in ['Settings ⚙️', 'Settings menu'])
 def settings_handler(message):
     # Get the user's settings from the database
@@ -184,9 +209,7 @@ def public_salary_handler(message):
     settings_handler(message)
 
 
-"""
-Searching functions
-"""
+# Searching functions
 
 
 def search_jobs(message, always_search=False):
@@ -205,10 +228,8 @@ def search_jobs(message, always_search=False):
         search_status = db_handler.get_user_search_status(message.chat.id, 'search_status')[0][0]
         always_search_status = db_handler.get_user_search_status(message.chat.id, 'always_search_status')[0][0]
         if not search_status and not always_search:
-            print('break')
             break
         elif not always_search_status and always_search:
-            print('break')
             break
         text = show_jobs(job)
 
@@ -266,18 +287,23 @@ def compare_jobs(message, always_search=False):
 
 
 def is_matching_job(message, job, experience, location, specialisation, salary):
+    # Check if job experience matches the specified experience
     if experience and job.experience not in experience:
         return False
 
+    # Check if job location matches the specified location
     if location and job.location != location:
         return False
 
+    # Check if job has already been seen by the user for the specified specialisation
     if is_job_seen(message, job, specialisation):
         return False
 
+    # Check if salary is set to 'Public salary' and the job has no salary information
     if salary == 'Public salary' and not job.salary:
         return False
 
+    # Return True if all conditions pass
     return True
 
 
@@ -323,9 +349,8 @@ def show_jobs(job):
     return text
 
 
-"""
-Settings keywords handlers
-"""
+# Settings keywords handlers
+
 # lists of choices for user settings used in the Telegram bot.
 specialisations = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutter', 'Python', 'PHP', 'Node.js',
                    'IOS', 'Android', 'C++']
@@ -357,9 +382,7 @@ def set_setting(message):
         settings_handler(message)
 
 
-"""
-Keyboards
-"""
+# Keyboards
 
 
 # Keyboard for search
