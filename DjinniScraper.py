@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from job_posting import JobPosting
 import re
 
+
 class DjinniScrapper:
     """
     Web Scraper for the Djinni website. Parses job postings for a specified specialisation.
@@ -106,8 +107,8 @@ class DjinniScrapper:
         for span in spans:
             text = span.text.strip()
             if any(job_type_keyword in text for job_type_keyword in job_types):
-                job_type = text
+                job_type = text.replace('· ', '')  # Remove unwanted characters
             elif experience_pattern.search(text):
-                experience = text
+                experience = text.replace('· ', '')  # Remove unwanted characters
 
         return job_type, experience

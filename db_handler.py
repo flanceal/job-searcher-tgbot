@@ -1,6 +1,7 @@
 import psycopg2
 from psycopg2 import pool
 from psycopg2 import sql
+# import logging
 
 
 # Set up a connection pool with a minimum of 1 connection and a maximum of 5 connections
@@ -68,40 +69,34 @@ def insert_into_settings(message, column):
         return f"An error occurred: {err}"
 
 
-def insert_seen_job(chat_id, title, specialisation, company, experience, location, link):
-    """Inserts a new row into the seen_jobs table with the provided data.
+# Set up logging
+# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-        Args:
-            chat_id (int): The ID of the user who saw the job.
-            title (str): The title of the job.
-            specialisation (str): The specialisation of the job
-            company (str): The name of the company offering the job.
-            experience (str): The required experience level for the job.
-            location (str): The location of the job.
-            link (str): The URL link to the job posting.
-
-        Returns:
-            str: An error message string if an error occurs, otherwise returns None.
-        """
+def insert_seen_job(chat_id, link):
     try:
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
-            # Create an SQL statement that inserts a new row into the seen_jobs table
-            sql_statement = sql.SQL("INSERT INTO seen_jobs(user_id, title, specialisation, "
-                                    "company, experience, location, link) "
-                                    "VALUES (%s, %s, %s, %s, %s, %s, %s)")
+            sql_statement = sql.SQL("INSERT INTO seen_jobs(user_id, link) "
+                                    "VALUES (%s, %s)")
 
-            # Execute the SQL statement with the given parameters
-            cursor.execute(sql_statement, (chat_id, title, specialisation, company, experience, location, link))
+            # # Log the SQL statement and parameters
+            # logging.debug(f"Executing SQL: {sql_statement.as_string(conn)}")
+            # logging.debug(
+            #     f"With parameters: {chat_id}, {title}, {specialisation}, {company}, {experience}, {location}, {link}")
 
-            # Commit the transaction to the database
+            cursor.execute(sql_statement, (chat_id, link))
             conn.commit()
 
-            # Close the cursor and return the connection to the connection pool
-            cursor.close()
-            conn_pool.putconn(conn)
+            # logging.info('Insert operation committed successfully.')
+
     except psycopg2.Error as err:
-        # If an error occurs, return an error message string
+        # logging.error(f"An error occurred: {err}")
         return f"An error occurred: {err}"
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn_pool.putconn(conn)
 
 
 def get_from_settings(user_id, *args):
@@ -135,7 +130,7 @@ def get_from_settings(user_id, *args):
         print("An error occurred: ", err)
 
 
-def get_jobs(chat_id, specialisation):
+def get_jobs(chat_id):
     """
     Retrieve jobs from the seen_jobs table for a specific user and specialisation.
 
@@ -153,11 +148,11 @@ def get_jobs(chat_id, specialisation):
         with conn_pool.getconn() as conn, conn.cursor() as cursor:
             # Create an SQL statement that selects the specified columns from the 'seen_jobs' table,
             # for the specified user ID and specialisation
-            get_statement = sql.SQL("SELECT title, company, experience, location, link FROM seen_jobs "
-                                    "WHERE user_id = %s AND specialisation = %s")
+            get_statement = sql.SQL("SELECT link FROM seen_jobs "
+                                    "WHERE user_id = %s")
 
             # Execute the SQL statement, passing in the user ID and specialisation as parameters
-            cursor.execute(get_statement, [chat_id, specialisation])
+            cursor.execute(get_statement, [chat_id])
 
             # Fetch all rows of the result set
             results = cursor.fetchall()

@@ -240,10 +240,9 @@ def search_jobs(message, always_search=False):
         markup.add(button)
 
         # Insert shown job into seen_jobs table
-        db_handler.insert_seen_job(message.chat.id, job.title, job.specialisation,
-                                   job.company, job.experience, job.location, job.link)
+        db_handler.insert_seen_job(message.chat.id, job.link)
         bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=markup)
-        sleep(1)
+        sleep(3)
 
 
 def compare_jobs(message, always_search=False):
@@ -260,10 +259,9 @@ def compare_jobs(message, always_search=False):
     Returns:
         None
     """
-    print('new search')
     experiences = {"0-1 years": ["No experience", '1 year of experience'],
                    "1-2 years": ['1 year of experience', '2 years of experience'],
-                   "2-3 years": ['2 years of experience', '3 роки досвіду'],
+                   "2-3 years": ['2 years of experience', '3 years of experience'],
                    '3-5 years': ['3 years of experience', '5 years of experience'],
                    '5+ years': ['5 years of experience']}
     # Get the user's settings from the database
@@ -297,7 +295,7 @@ def is_matching_job(message, job, experience, location, specialisation, salary):
         return False
 
     # Check if job has already been seen by the user for the specified specialisation
-    if is_job_seen(message, job, specialisation):
+    if is_job_seen(message, job.link):
         return False
 
     # Check if salary is set to 'Public salary' and the job has no salary information
@@ -308,20 +306,15 @@ def is_matching_job(message, job, experience, location, specialisation, salary):
     return True
 
 
-def is_job_seen(message, job, specialisation):
+def is_job_seen(message, job_link):
     """
     Check if a job has already been seen by the user.
-
-    Args:
-        message (telegram.Message): The message object containing user information.
-        job (Job): The job object to check.
-        specialisation (str): The specialisation of the job.
 
     Returns:
         bool: True if the job has already been seen, False otherwise.
     """
-    for title, company, experience, location, link in db_handler.get_jobs(message.chat.id, specialisation):
-        if job.title == title and job.company == company and job.experience == experience and job.link == link:
+    for link in db_handler.get_jobs(message.chat.id):
+        if link[0] == job_link:
             return True
     return False
 
@@ -337,15 +330,18 @@ def show_jobs(job):
         str: The formatted text representation of the job.
     """
     text = f"""
-    <b>Job Found ✨</b>
+    <b>🔥 New Job Opportunity!</b>
 
-    {job.title}
-    Company: {job.company}
-    Required Experience: {job.experience}
-    Workplace: {job.location}
+    <b>Title:</b> <i>{job.title}</i>
+    <b>Company:</b> <i>{job.company}</i>
+    <b>Experience Needed:</b> <i>{job.experience}</i>
+    <b>Location:</b> <i>{job.location}</i>
     """
+
     if job.salary:
-        text += f"\nSalary: {job.salary}"
+        text += f"<b>💰 Salary:</b> <i>{job.salary}</i>"
+
+    text += "\n<b>🌟 Don't miss out on this opportunity!</b>"
 
     return text
 
@@ -357,7 +353,7 @@ specialisations = ['Front-End(JavaScript)', 'Java', 'C#/.NET', 'Python', 'Flutte
                    'IOS', 'Android', 'C++']
 
 experiences_choices = ['0-1 years', '1-2 years', '2-3 years', '3-5 years', '5+ years', 'Any experience']
-onsite_remote_choices = ['Remote', 'On-site', "Any workplace", 'Settings menu']
+onsite_remote_choices = ['Full Remote', 'Office Work', "Any workplace", 'Settings menu']
 salary_choices = ['Public salary', 'with a disclosed/public salary']
 
 
@@ -468,8 +464,8 @@ def experience_keyboard():
 # On-site/Remote keyboard
 def onsite_remote_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    button1 = 'Remote'
-    button2 = 'On-site'
+    button1 = 'Full Remote'
+    button2 = 'Office Work'
     button3 = 'Any workplace'
     button4 = 'Settings menu'
 
