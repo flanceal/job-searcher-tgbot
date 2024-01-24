@@ -30,7 +30,7 @@ def init_new_user(message):
             cursor.close()
             conn_pool.putconn(conn)
     except psycopg2.Error as err:
-        print('An error occurred: ', err)
+        print('An error occurred while initiating new user: ', err)
 
 
 def insert_into_settings(message, column):

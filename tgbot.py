@@ -7,7 +7,7 @@ from db_handler import get_from_settings
 
 
 # api token of telegram bot
-API_TOKEN = '6224238593:AAHTNgVVOf9za27beLuC4UgVhDI7YPgcRBs'
+API_TOKEN = '6248629109:AAHENOf8Wcc1CDB8NCkBQuVkhKcfhVndy4k'
 
 # define telegram bot instance
 bot = telebot.TeleBot(API_TOKEN)
@@ -33,6 +33,7 @@ def send_welcome(message):
     Let me know how I can help you! 🤖
     """
     # initialise new user in database table
+    print(f"User Id: {message.chat.id}")
     db_handler.init_new_user(message)
     bot.send_message(message.chat.id, text=greeting_message, parse_mode='HTML')
     main_menu(message)
@@ -113,7 +114,7 @@ def always_search_settings_handler(message):
     db_handler.update_search_status(message.chat.id, 'always_search_status', True)
     # Send activation message
     bot.send_message(message.chat.id, "Always search has been activated."
-                                      " I will continuously search for new job opportunities.")
+                                      "I will continuously search for new job opportunities.")
     main_menu(message)
 
     # Perform job searches while always search is enabled
@@ -260,11 +261,11 @@ def compare_jobs(message, always_search=False):
         None
     """
     print('new search')
-    experiences = {"0-1 years": ["Без досвіду", '1 рік досвіду'],
-                   "1-2 years": ['1 рік досвіду', '2 роки досвіду'],
-                   "2-3 years": ['2 роки досвіду', '3 роки досвіду'],
-                   '3-5 years': ['3 роки досвіду', '5 років досвіду'],
-                   '5+ years': ['5 років досвіду']}
+    experiences = {"0-1 years": ["No experience", '1 year of experience'],
+                   "1-2 years": ['1 year of experience', '2 years of experience'],
+                   "2-3 years": ['2 years of experience', '3 роки досвіду'],
+                   '3-5 years': ['3 years of experience', '5 years of experience'],
+                   '5+ years': ['5 years of experience']}
     # Get the user's settings from the database
     specialisation, location, salary = get_from_settings(message.chat.id, 'specialisation', 'onsite_remote', 'salary')
     experience = experiences.get(get_from_settings(message.chat.id, 'experience')[0])
